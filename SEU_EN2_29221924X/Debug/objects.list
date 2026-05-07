@@ -11,6 +11,7 @@
 "./Core/Src/task_COMM.o"
 "./Core/Src/task_CONSOLE.o"
 "./Core/Src/task_EJER3.o"
+"./Core/Src/task_HW.o"
 "./Core/Src/task_TIME.o"
 "./Core/Src/utility_buff.o"
 "./Core/Startup/startup_stm32f411retx.o"

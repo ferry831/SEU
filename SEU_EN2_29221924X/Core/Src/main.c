@@ -265,115 +265,117 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  uint32_t now = HAL_GetTick();
 
-	      /* ---- BTN_IZQ: cambiar sensor (PC7) ---- */
-	      static uint8_t btn_izq_prev = 0;
-	      uint8_t btn_izq = (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7) == GPIO_PIN_RESET) ? 1 : 0;
-	      if (btn_izq && !btn_izq_prev) {
-	          g_sensor_sel ^= 1;
-	          printf(">> Sensor: %s\r\n", g_sensor_sel == 0 ? "LDR (luz)" : "NTC (temp)");
-	          HAL_Delay(50);
-	      }
-	      btn_izq_prev = btn_izq;
-
-	      /* BTN_DER: silenciar alarma (PB6) */
-	      static uint8_t btn_der_prev = 0;
-	      uint8_t btn_der = (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6) == GPIO_PIN_RESET) ? 1 : 0;
-	      if (btn_der && !btn_der_prev) {
-	          if (g_alarm_active) {
-	              g_alarm_active   = 0;
-	              g_alarm_disarmed = 1;
-	              g_disarm_tick    = now;
-	              HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET); /* buzzer OFF */
-	              printf(">> Alarma silenciada. Reactivación en 10 s\r\n");
-	          }
-	          HAL_Delay(50);
-	      }
-	      btn_der_prev = btn_der;
-
-
-
-	      /* Leer sensores  */
-	      uint32_t pot_pct  = (POT_read() * 1000) / 4095;
-	      uint32_t ldr_pct  = LDR_read();
-	      int32_t  temp_x10 = NTC_read_x10();
-
-	      uint32_t ntc_pct = 0;
-	      if (temp_x10 > 250) {
-	          ntc_pct = ((uint32_t)(temp_x10 - 250) * 1000) / 50;
-	          if (ntc_pct > 1000) ntc_pct = 1000;
-	      }
-
-	      uint32_t display_pct = (g_sensor_sel == 0) ? ldr_pct : ntc_pct;
-
-	      /* Reacticación 10s  */
-	      if (g_alarm_disarmed && (now - g_disarm_tick) >= 10000) {
-	          g_alarm_disarmed = 0;
-	          printf(">> Alarma preparada.\r\n");
-	      }
-
-	      /*  Check nivel de alarma */
-	      /*if (!g_alarm_active && !g_alarm_disarmed) {
-	          if (display_pct > pot_pct) {
-	              g_alarm_active = 1;
-	              HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);  buzzer ON
-	              printf("!! ALARMA: sensor=%lu.%lu%% nivel=%lu.%lu%%\r\n",
-	                     display_pct / 10, display_pct % 10,
-	                     pot_pct / 10, pot_pct % 10);
-	          }
-	      }*/
-
-	      //Detecta los 2 sensores simultaneamente
-	      if (!g_alarm_active && !g_alarm_disarmed) {
-	          if (ldr_pct > pot_pct || ntc_pct > pot_pct) {
-	              g_alarm_active = 1;
-	              HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
-	              printf("!! ALARMA — LDR: %lu.%lu%% NTC: %lu.%lu%% nivel: %lu.%lu%%\r\n",
-	                     ldr_pct/10,  ldr_pct%10,
-	                     ntc_pct/10,  ntc_pct%10,
-	                     pot_pct/10,  pot_pct%10);
-	          }
-	      }
-
-	      /* Parpadeo LED de alarma */
-	      if ((now - g_last_flash_tick) >= 140) {
-	          g_flash_state ^= 1;
-	          g_last_flash_tick = now;
-	      }
-
-	      /* Bargraph + LED */
-	      uint8_t alarm_led = (uint8_t)((pot_pct * 7) / 1000);
-	      uint8_t num       = (uint8_t)((display_pct * 8) / 1000);
-	      if (num > 8) num = 8;
-	      uint8_t pattern = (num == 8) ? 0xFF : (uint8_t)((1 << num) - 1);
-
-	      if (g_flash_state)
-	          pattern |=  (1 << alarm_led);
-	      else
-	          pattern &= ~(1 << alarm_led);
-
-	      LED_setAll(pattern);
-
-	      /*if (g_sensor_sel == 0) {
-	          printf("POT: %lu.%lu%%  |  LDR: %lu.%lu%%  |  Alarma: %s\r\n",
-	                 pot_pct / 10, pot_pct % 10,
-	                 display_pct / 10, display_pct % 10,
-	                 g_alarm_active ? "ACTIVA" : (g_alarm_disarmed ? "SILENCIADA" : "Preparada"));
-	      } else {
-	          printf("POT: %lu.%lu%%  |  NTC: %ld.%ld C  |  Alarma: %s\r\n",
-	                 pot_pct / 10, pot_pct % 10,
-	                 temp_x10 / 10, (temp_x10 < 0 ? -temp_x10 : temp_x10) % 10,
-	                 g_alarm_active ? "ACTIVA" : (g_alarm_disarmed ? "SILENCIADA" : "Preparada"));
-	      }*/
-
-	      printf("POT: %lu.%lu%%  |  LDR: %lu.%lu%%  |  NTC: %ld.%ld C  |  Alarma: %s\r\n",
-	             pot_pct/10, pot_pct%10,
-	             ldr_pct/10, ldr_pct%10,
-	             temp_x10/10, (temp_x10 < 0 ? -temp_x10 : temp_x10) % 10,
-	             g_alarm_active ? "ACTIVA" : (g_alarm_disarmed ? "SILENCIADA" : "Preparada"));
-
-	      HAL_Delay(500);
+	  vTaskDelay(1000 / portTICK_RATE_MS);
+//	  uint32_t now = HAL_GetTick();
+//
+//	      /* ---- BTN_IZQ: cambiar sensor (PC7) ---- */
+//	      static uint8_t btn_izq_prev = 0;
+//	      uint8_t btn_izq = (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7) == GPIO_PIN_RESET) ? 1 : 0;
+//	      if (btn_izq && !btn_izq_prev) {
+//	          g_sensor_sel ^= 1;
+//	          printf(">> Sensor: %s\r\n", g_sensor_sel == 0 ? "LDR (luz)" : "NTC (temp)");
+//	          HAL_Delay(50);
+//	      }
+//	      btn_izq_prev = btn_izq;
+//
+//	      /* BTN_DER: silenciar alarma (PB6) */
+//	      static uint8_t btn_der_prev = 0;
+//	      uint8_t btn_der = (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6) == GPIO_PIN_RESET) ? 1 : 0;
+//	      if (btn_der && !btn_der_prev) {
+//	          if (g_alarm_active) {
+//	              g_alarm_active   = 0;
+//	              g_alarm_disarmed = 1;
+//	              g_disarm_tick    = now;
+//	              HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET); /* buzzer OFF */
+//	              printf(">> Alarma silenciada. Reactivación en 10 s\r\n");
+//	          }
+//	          HAL_Delay(50);
+//	      }
+//	      btn_der_prev = btn_der;
+//
+//
+//
+//	      /* Leer sensores  */
+//	      uint32_t pot_pct  = (POT_read() * 1000) / 4095;
+//	      uint32_t ldr_pct  = LDR_read();
+//	      int32_t  temp_x10 = NTC_read_x10();
+//
+//	      uint32_t ntc_pct = 0;
+//	      if (temp_x10 > 250) {
+//	          ntc_pct = ((uint32_t)(temp_x10 - 250) * 1000) / 50;
+//	          if (ntc_pct > 1000) ntc_pct = 1000;
+//	      }
+//
+//	      uint32_t display_pct = (g_sensor_sel == 0) ? ldr_pct : ntc_pct;
+//
+//	      /* Reacticación 10s  */
+//	      if (g_alarm_disarmed && (now - g_disarm_tick) >= 10000) {
+//	          g_alarm_disarmed = 0;
+//	          printf(">> Alarma preparada.\r\n");
+//	      }
+//
+//	      /*  Check nivel de alarma */
+//	      /*if (!g_alarm_active && !g_alarm_disarmed) {
+//	          if (display_pct > pot_pct) {
+//	              g_alarm_active = 1;
+//	              HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);  buzzer ON
+//	              printf("!! ALARMA: sensor=%lu.%lu%% nivel=%lu.%lu%%\r\n",
+//	                     display_pct / 10, display_pct % 10,
+//	                     pot_pct / 10, pot_pct % 10);
+//	          }
+//	      }*/
+//
+//	      //Detecta los 2 sensores simultaneamente
+//	      if (!g_alarm_active && !g_alarm_disarmed) {
+//	          if (ldr_pct > pot_pct || ntc_pct > pot_pct) {
+//	              g_alarm_active = 1;
+//	              HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
+//	              printf("!! ALARMA — LDR: %lu.%lu%% NTC: %lu.%lu%% nivel: %lu.%lu%%\r\n",
+//	                     ldr_pct/10,  ldr_pct%10,
+//	                     ntc_pct/10,  ntc_pct%10,
+//	                     pot_pct/10,  pot_pct%10);
+//	          }
+//	      }
+//
+//	      /* Parpadeo LED de alarma */
+//	      if ((now - g_last_flash_tick) >= 140) {
+//	          g_flash_state ^= 1;
+//	          g_last_flash_tick = now;
+//	      }
+//
+//	      /* Bargraph + LED */
+//	      uint8_t alarm_led = (uint8_t)((pot_pct * 7) / 1000);
+//	      uint8_t num       = (uint8_t)((display_pct * 8) / 1000);
+//	      if (num > 8) num = 8;
+//	      uint8_t pattern = (num == 8) ? 0xFF : (uint8_t)((1 << num) - 1);
+//
+//	      if (g_flash_state)
+//	          pattern |=  (1 << alarm_led);
+//	      else
+//	          pattern &= ~(1 << alarm_led);
+//
+//	      LED_setAll(pattern);
+//
+//	      /*if (g_sensor_sel == 0) {
+//	          printf("POT: %lu.%lu%%  |  LDR: %lu.%lu%%  |  Alarma: %s\r\n",
+//	                 pot_pct / 10, pot_pct % 10,
+//	                 display_pct / 10, display_pct % 10,
+//	                 g_alarm_active ? "ACTIVA" : (g_alarm_disarmed ? "SILENCIADA" : "Preparada"));
+//	      } else {
+//	          printf("POT: %lu.%lu%%  |  NTC: %ld.%ld C  |  Alarma: %s\r\n",
+//	                 pot_pct / 10, pot_pct % 10,
+//	                 temp_x10 / 10, (temp_x10 < 0 ? -temp_x10 : temp_x10) % 10,
+//	                 g_alarm_active ? "ACTIVA" : (g_alarm_disarmed ? "SILENCIADA" : "Preparada"));
+//	      }*/
+//
+//	      printf("POT: %lu.%lu%%  |  LDR: %lu.%lu%%  |  NTC: %ld.%ld C  |  Alarma: %s\r\n",
+//	             pot_pct/10, pot_pct%10,
+//	             ldr_pct/10, ldr_pct%10,
+//	             temp_x10/10, (temp_x10 < 0 ? -temp_x10 : temp_x10) % 10,
+//	             g_alarm_active ? "ACTIVA" : (g_alarm_disarmed ? "SILENCIADA" : "Preparada"));
+//
+//	      HAL_Delay(500);
 
     /* USER CODE END WHILE */
 

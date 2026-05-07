@@ -7,6 +7,7 @@
 #include "tareas.h"
 #include <string.h>
 #include <task.h>
+#include "task_TIME.h"
 
 #include "task_CONSOLE.h"
 #include "main.h"

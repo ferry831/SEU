@@ -47,7 +47,8 @@ Core/Src/tareas.o: ../Core/Src/tareas.c ../Core/Inc/tareas.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h \
  ../Core/Inc/task_CONSOLE.h ../Core/Inc/utility_buff.h \
- ../Core/Inc/task_TIME.h ../Core/Inc/task_COMM.h ../Core/Inc/task_EJER3.h
+ ../Core/Inc/task_TIME.h ../Core/Inc/task_COMM.h ../Core/Inc/task_EJER3.h \
+ ../Core/Inc/task_HW.h
 ../Core/Inc/tareas.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
@@ -102,3 +103,4 @@ Core/Src/tareas.o: ../Core/Src/tareas.c ../Core/Inc/tareas.h \
 ../Core/Inc/task_TIME.h:
 ../Core/Inc/task_COMM.h:
 ../Core/Inc/task_EJER3.h:
+../Core/Inc/task_HW.h:

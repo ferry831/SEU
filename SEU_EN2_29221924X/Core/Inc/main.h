@@ -54,6 +54,18 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+extern uint8_t  g_sensor_sel;
+extern uint8_t  g_flash_state;
+extern uint32_t g_last_flash_tick;
+extern uint8_t  g_alarm_active;
+extern uint8_t  g_alarm_disarmed;
+extern uint32_t g_disarm_tick;
+
+uint32_t POT_read(void);
+uint32_t LDR_read(void);
+int32_t  NTC_read_x10(void);
+void LED_setAll(uint8_t pattern);
+void LED_bargraph(uint32_t pct_x10);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
