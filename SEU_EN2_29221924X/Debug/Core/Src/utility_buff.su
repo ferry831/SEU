@@ -1,0 +1,12 @@
+../Core/Src/utility_buff.c:7:10:BUFF_is_empty	16	static
+../Core/Src/utility_buff.c:11:10:BUFF_is_full	16	static
+../Core/Src/utility_buff.c:15:10:BUFF_inserta	16	static
+../Core/Src/utility_buff.c:25:10:BUFF_extrae	16	static
+../Core/Src/utility_buff.c:37:10:BUFF_extrae_prot	24	static
+../Core/Src/utility_buff.c:54:10:BUFF_inserta_prot	24	static
+../Core/Src/utility_buff.c:73:10:BUFF_insert_prot_priority	24	static
+../Core/Src/utility_buff.c:91:10:BUFF_inserta_cad	32	static
+../Core/Src/utility_buff.c:106:6:BUFF_lock	16	static
+../Core/Src/utility_buff.c:115:6:BUFF_unlock	16	static
+../Core/Src/utility_buff.c:122:10:BUFF_inserta_cad_priority	32	static
+../Core/Src/utility_buff.c:156:17:bufferCreat	24	static

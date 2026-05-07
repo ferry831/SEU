@@ -1,0 +1,15 @@
+../Core/Src/main.c:71:5:_write	1
+../Core/Src/main.c:81:10:POT_read	1
+../Core/Src/main.c:101:10:LDR_read	3
+../Core/Src/main.c:131:9:NTC_read_x10	4
+../Core/Src/main.c:163:6:LED_setAll	1
+../Core/Src/main.c:185:6:LED_bargraph	3
+../Core/Src/main.c:202:5:main	22
+../Core/Src/main.c:389:6:SystemClock_Config	3
+../Core/Src/main.c:436:13:MX_ADC1_Init	3
+../Core/Src/main.c:485:13:MX_USART1_UART_Init	2
+../Core/Src/main.c:518:13:MX_USART2_UART_Init	2
+../Core/Src/main.c:546:13:MX_DMA_Init	1
+../Core/Src/main.c:567:13:MX_GPIO_Init	1
+../Core/Src/main.c:661:6:StartDefaultTask	1
+../Core/Src/main.c:676:6:Error_Handler	1
