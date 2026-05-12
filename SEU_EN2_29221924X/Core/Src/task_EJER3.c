@@ -40,7 +40,8 @@ void Task_EJER3( void *pvParameters ){
 	while (1) {
 		global_ejer3_it++;
 		//ALUMNO Rellenar Ejercicio 3
-		bprintf("Contador: %lu\r\n", contador++);
+		//bprintf("Contador: %lu\r\n", contador++);
+		bprintf("Contador: %lu | Modo: %d\r\n", contador++, g_mode); //g_mode
 
 		/* Imprimir hora si está disponible */
 			    if (task_TIME_timeAvailable()) {

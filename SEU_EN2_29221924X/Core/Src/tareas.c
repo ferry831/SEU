@@ -18,7 +18,12 @@
 #include "task_EJER3.h"
 #include "task_HW.h"
 
+	//g_mode (Entregable 2)
+	volatile int g_mode = 0;  /* 0=Normal, 1=Clone, 2=Test */
+
 void CONFIGURACION_INICIAL(void){
+
+
 
 	BaseType_t res_task;
 

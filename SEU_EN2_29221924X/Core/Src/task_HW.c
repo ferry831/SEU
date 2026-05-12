@@ -19,24 +19,46 @@ void Task_HW(void *pvParameters) {
         /* ---- BTN_IZQ (PC7) ---- */
         static uint8_t btn_izq_prev = 0;
         uint8_t btn_izq = (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7) == GPIO_PIN_RESET) ? 1 : 0;
-        if (btn_izq && !btn_izq_prev) {
-            g_sensor_sel ^= 1;
-            bprintf(">> Sensor: %s\r\n", g_sensor_sel == 0 ? "LDR (luz)" : "NTC (temp)");
-        }
-        btn_izq_prev = btn_izq;
 
         /* ---- BTN_DER (PB6) ---- */
         static uint8_t btn_der_prev = 0;
         uint8_t btn_der = (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6) == GPIO_PIN_RESET) ? 1 : 0;
-        if (btn_der && !btn_der_prev) {
-            if (g_alarm_active) {
-                g_alarm_active   = 0;
-                g_alarm_disarmed = 1;
-                g_disarm_tick    = now;
-                HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
-                bprintf(">> Alarma silenciada. Reactivación en 10s\r\n");
+
+        /* ---- Incrementar g_mode ---- */
+        static uint32_t both_btn_tick     = 0;
+        static uint8_t  both_btn_counting = 0;
+
+        if (btn_izq && btn_der) {
+            if (!both_btn_counting) {
+                both_btn_counting = 1;
+                both_btn_tick = now;
+            } else if ((now - both_btn_tick) >= 2000) {
+                g_mode = (g_mode + 1) % 3;
+                bprintf(">> Modo: %d\r\n", g_mode);
+                both_btn_counting = 0;
+            }
+        } else {
+            both_btn_counting = 0;
+
+            /* BTN_IZQ solo: cambiar sensor */
+            if (btn_izq && !btn_izq_prev) {
+                g_sensor_sel ^= 1;
+                bprintf(">> Sensor: %s\r\n", g_sensor_sel == 0 ? "LDR (luz)" : "NTC (temp)");
+            }
+
+            /* BTN_DER solo: silenciar alarma */
+            if (btn_der && !btn_der_prev) {
+                if (g_alarm_active) {
+                    g_alarm_active   = 0;
+                    g_alarm_disarmed = 1;
+                    g_disarm_tick    = now;
+                    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
+                    bprintf(">> Alarma silenciada. Reactivacion en 10s\r\n");
+                }
             }
         }
+
+        btn_izq_prev = btn_izq;
         btn_der_prev = btn_der;
 
         /* ---- Leer sensores ---- */

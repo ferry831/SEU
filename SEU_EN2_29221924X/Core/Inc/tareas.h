@@ -24,8 +24,6 @@
 #include <math.h>
 
 
-
-
 //operativa
 #define FREERTOS_5SEG		(5000/portTICK_PERIOD_MS)
 
@@ -40,5 +38,8 @@
 #define LOW_PRIORITY (( configMAX_PRIORITIES - 1 )>>1)-1
 
 void CONFIGURACION_INICIAL(void);
+
+//g_mode (Entregable 2)
+extern volatile int g_mode;
 
 #endif
