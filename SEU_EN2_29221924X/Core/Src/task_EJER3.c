@@ -32,7 +32,6 @@ void Task_EJER3_init(void){
 void Task_EJER3( void *pvParameters ){
 
 	int signal;
-	uint32_t contador = 0;
 
 	//ALUMNO Rellenar Ejercicio 3
 	bprintf(PPB_PRJ " at " __TIME__ "\r\n");
@@ -40,8 +39,8 @@ void Task_EJER3( void *pvParameters ){
 	while (1) {
 		global_ejer3_it++;
 		//ALUMNO Rellenar Ejercicio 3
-		//bprintf("Contador: %lu\r\n", contador++);
-		bprintf("Contador: %lu | Modo: %d\r\n", contador++, g_mode); //g_mode
+		//bprintf("Contador: %lu\r\n", global_ejer3_it);
+		bprintf("Contador: %lu | Modo: %d\r\n", global_ejer3_it, g_mode); //g_mode
 
 		/* Imprimir hora si está disponible */
 			    if (task_TIME_timeAvailable()) {
