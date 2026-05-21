@@ -9,6 +9,7 @@
 #define __TAREAS_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "main.h"
 #include <tareas.h>
 #include <main.h>
