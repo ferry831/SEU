@@ -1,4 +1,0 @@
-../Core/Src/task_TIME.c:30:6:Task_TIME_init	24	static
-../Core/Src/task_TIME.c:44:6:Task_TIME	112	static
-../Core/Src/task_TIME.c:121:5:task_TIME_timeAvailable	4	static
-../Core/Src/task_TIME.c:125:8:task_TIME_getTime	32	static

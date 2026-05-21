@@ -1,7 +1,0 @@
-../Core/Src/task_CONSOLE.c:23:6:Task_CONSOLE	3
-../Core/Src/task_CONSOLE.c:45:6:print_bufferln	1
-../Core/Src/task_CONSOLE.c:54:6:print_buffer	2
-../Core/Src/task_CONSOLE.c:64:6:console_flush	1
-../Core/Src/task_CONSOLE.c:67:6:console_unlock	1
-../Core/Src/task_CONSOLE.c:72:6:bprintf_last	1
-../Core/Src/task_CONSOLE.c:82:6:bprintf	1

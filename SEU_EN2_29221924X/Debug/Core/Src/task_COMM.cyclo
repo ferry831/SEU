@@ -1,9 +1,0 @@
-../Core/Src/task_COMM.c:34:6:Task_COMM_init	4
-../Core/Src/task_COMM.c:64:6:Task_COMM	5
-../Core/Src/task_COMM.c:101:6:cleanResponse	7
-../Core/Src/task_COMM.c:137:6:WIFI_RESET	3
-../Core/Src/task_COMM.c:157:6:WIFI_Boot_TEST	2
-../Core/Src/task_COMM.c:183:6:WIFI_Boot	5
-../Core/Src/task_COMM.c:231:5:ESP_TimeOut_tworesponses	5
-../Core/Src/task_COMM.c:261:5:ESP_TimeOut	4
-../Core/Src/task_COMM.c:279:11:ESP_Send_Request	14
