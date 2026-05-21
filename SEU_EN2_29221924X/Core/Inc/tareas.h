@@ -39,7 +39,28 @@
 
 void CONFIGURACION_INICIAL(void);
 
+typedef struct {
+    float current;
+    float min;
+    float max;
+    float threshold;
+} SensorData_t;
+
+typedef struct {
+    SensorData_t temperature;
+    SensorData_t light;
+
+    bool local_alarm;
+    bool remote_alarm;
+
+    uint8_t cloned_node_id;
+    uint8_t local_node_id;
+} SystemState_t;
+
 //g_mode (Entregable 2)
 extern volatile int g_mode;
+extern SystemState_t g_system_state;
+
+extern osMutexId mutex;
 
 #endif

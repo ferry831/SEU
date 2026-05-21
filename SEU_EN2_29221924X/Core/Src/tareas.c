@@ -18,14 +18,29 @@
 #include "task_EJER3.h"
 #include "task_HW.h"
 
-	//g_mode (Entregable 2)
-	volatile int g_mode = 0;  /* 0=Normal, 1=Clone, 2=Test */
+//g_mode (Entregable 2)
+volatile int g_mode = 0;  /* 0=Normal, 1=Clone, 2=Test */
+
+SystemState_t g_system_state = {
+    // current, min, max, threshold
+    .temperature = {0.0f, 100.0f, -100.0f, 0.0f}, // TODO: ajustar valores min/max según el sensor
+    .light = {0.0f, 100.0f, -100.0f, 0.0f}, // TODO: ajustar valores min/max según el sensor
+
+    .local_alarm = false,
+    .remote_alarm = false,
+
+    .cloned_node_id = 0,
+    .local_node_id = 19 // 19 por el número del puesto en el lab
+};
+
+osMutexId mutex;
 
 void CONFIGURACION_INICIAL(void){
 
-
-
 	BaseType_t res_task;
+
+	osMutexDef(mutexDef);
+	mutex = osMutexCreate(osMutex(mutexDef));
 
  	IObuff=bufferCreat(128);
 
