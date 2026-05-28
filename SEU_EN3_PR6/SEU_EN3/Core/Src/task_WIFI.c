@@ -142,6 +142,16 @@ void WIFI_Boot(void)
 	HAL_UART_DMAStop(&huart1);
 	bprintf("4: %s",buff_WIFI);
 
+	/* configurar DNS */
+	for (ct=0; ct<2048; ct++) buff_WIFI[ct]=0;
+	HAL_UART_Receive_DMA(&huart1, buff_WIFI, 2048);
+	HAL_UART_Transmit(&huart1, (unsigned char *)"AT+CIPDNS=1,\"8.8.8.8\"\r\n",
+	                  strlen("AT+CIPDNS=1,\"8.8.8.8\"\r\n"), 10000);
+	vTaskDelay(1000/portTICK_RATE_MS);
+	HAL_UART_DMAStop(&huart1);
+	bprintf("DNS: %s\r\n", buff_WIFI);
+	/* ---- FIN AÑADIR ---- */
+
 	// verifica si hay IP
 	for (ct=0;ct<2048;ct++) buff_WIFI[ct]=0;
 	HAL_UART_Receive_DMA(&huart1, buff_WIFI,2048);

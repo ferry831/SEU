@@ -24,7 +24,7 @@ void Task_HW(void *pvParameters) {
         static uint8_t btn_der_prev = 0;
         uint8_t btn_der = (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6) == GPIO_PIN_RESET) ? 1 : 0;
 
-        /* ---- Incrementar g_mode ---- */
+        /* ---- Incrementar global_mode ---- */
         static uint32_t both_btn_tick     = 0;
         static uint8_t  both_btn_counting = 0;
 
@@ -33,8 +33,8 @@ void Task_HW(void *pvParameters) {
                 both_btn_counting = 1;
                 both_btn_tick = now;
             } else if ((now - both_btn_tick) >= 2000) {
-                g_mode = (g_mode + 1) % 3;
-                bprintf(">> Modo: %d\r\n", g_mode);
+                global_mode = (global_mode + 1) % 3;
+                bprintf(">> Modo: %d\r\n", global_mode);
                 both_btn_counting = 0;
             }
         } else {

@@ -30,7 +30,8 @@
 // Orion Context IoT name
 #define IoT_NAME   	 	  "SensorSEU_PPB00"
 #define IoT_NAME_CLONE    "SensorSEU_ZL"
-
+#define SSID      "routerSEU"
+#define SSID_PASS "00000000"
 // seminario 6
 
 #define HIGH_PRIORITY (( configMAX_PRIORITIES - 1 )>>1)+1
@@ -40,10 +41,12 @@
 void CONFIGURACION_INICIAL(void);
 
 //g_mode (Entregable 2)
-extern volatile int g_mode;
+extern volatile int global_mode;
 //Variables Sensores (PR6)
 extern volatile uint32_t g_ldr_pct;
 extern volatile int32_t  g_temp_x10;
 extern volatile uint32_t g_pot_pct;
+
+
 
 #endif
