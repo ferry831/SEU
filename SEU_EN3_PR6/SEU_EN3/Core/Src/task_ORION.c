@@ -11,47 +11,43 @@
 #include "task_ORION.h"
 #include "main.h"
 
-#define ORION_HOST  "pperezs-sec.disca.upv.es"
+/* Variables globales leídas desde task_HW */
+extern volatile uint8_t  g_alarm_active;
+extern uint32_t          g_ldr_pct;    /* intensidad lumínica 0-1000 */
+extern int32_t           g_temp_x10;   /* temperatura x10            */
+extern uint32_t          g_pot_pct;    /* nivel de alarma 0-1000     */
+
+#define ORION_HOST  "pperez2.disca.upv.es"
 #define ORION_PORT  1026
-#define SENSOR_ID   "SensorSEU_19"
+#define SENSOR_ID   "SensorSEU_01"
 
 void Task_ORION_init(void) {
-    BaseType_t res_task;
-    res_task = xTaskCreate(Task_ORION, "ORION", 2048, NULL,
-                           NORMAL_PRIORITY, NULL);
-    if (res_task != pdPASS) {
-        bprintf("PANIC: Error al crear Tarea ORION\r\n");
-        fflush(NULL);
-        while(1);
-    }
+    xTaskCreate(Task_ORION, "ORION", 2048, NULL, NORMAL_PRIORITY, NULL);
 }
 
 void Task_ORION(void *pvParameters) {
 
-    char body_buf[512];
-    int  signal;
+    static uint8_t http_buf[1024];
+    static uint8_t body_buf[512];
+    int signal;
 
-    /* Esperar a que el WiFi esté listo */
-    vTaskDelay(15000 / portTICK_RATE_MS);
+    vTaskDelay(15000 / portTICK_RATE_MS);  /* esperar a que WiFi esté listo */
 
     while (1) {
 
-        /* Solo publicar en modo Normal (g_mode == 0) */
-        if (global_mode != 0) {
+        /* Solo publicar en modo Normal */
+        if (g_mode != 0) {
             vTaskDelay(10000 / portTICK_RATE_MS);
             continue;
         }
 
-        /* ---- Leer sensores ---- */
-        int32_t  temp_x10 = g_temp_x10;
-        uint32_t ldr_pct  = g_ldr_pct;
-        uint32_t pot_pct  = g_pot_pct;
-
-        int temp_int = temp_x10 / 10;
-        int temp_dec = (temp_x10 < 0 ? -temp_x10 : temp_x10) % 10;
-
         /* ---- Construir el cuerpo JSON ---- */
-        snprintf(body_buf, sizeof(body_buf),
+        /* Temperatura: valor, nivel alarma, min, max */
+        float temp_c    = (float)g_temp_x10 / 10.0f;
+        float pot_pct_f = (float)g_pot_pct  / 10.0f;
+        float ldr_pct_f = (float)g_ldr_pct  / 10.0f;
+
+        snprintf((char *)body_buf, sizeof(body_buf),
             "{"
             "\"contextElements\":[{"
             "\"type\":\"Sensor\","
@@ -59,9 +55,9 @@ void Task_ORION(void *pvParameters) {
             "\"id\":\"%s\","
             "\"attributes\":["
             "{\"name\":\"Temperatura\",\"type\":\"floatarray\","
-             "\"value\":\"%d.%d,%lu.%lu,0.0,50.0\"},"
+             "\"value\":\"%.1f,%.1f,0.0,50.0\"},"
             "{\"name\":\"IntensidadLuz\",\"type\":\"floatarray\","
-             "\"value\":\"%lu.%lu,%lu.%lu,0.0,100.0\"},"
+             "\"value\":\"%.1f,%.1f,0.0,100.0\"},"
             "{\"name\":\"Alarma\",\"type\":\"boolean\","
              "\"value\":\"%s\"},"
             "{\"name\":\"modo\",\"type\":\"string\","
@@ -70,48 +66,39 @@ void Task_ORION(void *pvParameters) {
             "\"updateAction\":\"APPEND\""
             "}",
             SENSOR_ID,
-            temp_int, temp_dec,
-            pot_pct / 10, pot_pct % 10,
-            ldr_pct / 10, ldr_pct % 10,
-            pot_pct / 10, pot_pct % 10,
+            temp_c,   pot_pct_f,   /* Temperatura: valor, nivel alarma */
+            ldr_pct_f, pot_pct_f,  /* IntensidadLuz: valor, nivel alarma */
             g_alarm_active ? "T" : "F",
             SENSOR_ID
         );
 
         /* ---- Construir la petición HTTP POST ---- */
-        /* Rellenar la estructura COMM_request directamente */
+        snprintf((char *)http_buf, sizeof(http_buf),
+            "POST /v1/updateContext HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "Content-Type: application/json\r\n"
+            "Accept: application/json\r\n"
+            "Content-Length: %d\r\n"
+            "\r\n"
+            "%s",
+            ORION_HOST,
+            (int)strlen((char *)body_buf),
+            body_buf
+        );
+
+        /*  Enviar a través de task_COMM  */
         signal = 1;
         do {
-            if (xSemaphoreTake(COMM_xSem,
-                    20000 / portTICK_RATE_MS) != pdTRUE) {
+            if (xSemaphoreTake(COMM_xSem, 20000/portTICK_RATE_MS) != pdTRUE) {
                 bprintf("ORION: timeout semaforo\r\n");
                 HAL_NVIC_SystemReset();
             }
             if (COMM_request.command == 0) {
-                COMM_request.command  = 1;
-                COMM_request.result   = 0;
-                COMM_request.dst_port = ORION_PORT;
-
-                /* Copiar dirección al buffer fijo */
-                strncpy((char *)COMM_request.dst_address,
-                        ORION_HOST,
-                        sizeof(COMM_request.dst_address) - 1);
-
-                /* Construir petición HTTP directamente en el buffer */
-                snprintf((char *)COMM_request.HTTP_request,
-                         sizeof(COMM_request.HTTP_request),
-                    "POST /v1/updateContext HTTP/1.1\r\n"
-                    "Host: %s\r\n"
-                    "Content-Type: application/json\r\n"
-                    "Accept: application/json\r\n"
-                    "Content-Length: %d\r\n"
-                    "\r\n"
-                    "%s",
-                    ORION_HOST,
-                    (int)strlen(body_buf),
-                    body_buf
-                );
-
+                COMM_request.command      = 1;
+                COMM_request.result       = 0;
+                COMM_request.dst_port     = ORION_PORT;
+                COMM_request.dst_address  = (uint8_t *)ORION_HOST;
+                COMM_request.HTTP_request = http_buf;
                 signal = 0;
                 xSemaphoreGive(COMM_xSem);
             } else {
@@ -124,15 +111,11 @@ void Task_ORION(void *pvParameters) {
         while (COMM_request.result != 1)
             vTaskDelay(10 / portTICK_RATE_MS);
 
-        /* Comprobar si la publicación fue exitosa */
-        if (strstr((char *)COMM_request.HTTP_response, "200") != NULL)
-            bprintf("ORION: publicado OK\r\n");
-        else
-            bprintf("ORION: error al publicar\r\n");
+        bprintf("ORION: publicado OK\r\n");
 
         COMM_request.result  = 0;
         COMM_request.command = 0;
 
-        vTaskDelay(10000 / portTICK_RATE_MS);
+        vTaskDelay(10000 / portTICK_RATE_MS);  /* publicar cada 10 s */
     }
 }

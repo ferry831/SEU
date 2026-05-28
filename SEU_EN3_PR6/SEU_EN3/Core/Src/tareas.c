@@ -21,7 +21,7 @@
 #include "task_ORION.h"
 
 	//g_mode (Entregable 2)
-	volatile int global_mode = 0;  /* 0=Normal, 1=Clone, 2=Test */
+	volatile int g_mode = 0;  /* 0=Normal, 1=Clone, 2=Test */
 	//Variables Sensores (PR6)
 	volatile uint32_t g_ldr_pct  = 0;
 	volatile int32_t  g_temp_x10 = 0;
@@ -46,18 +46,11 @@ void CONFIGURACION_INICIAL(void){
  				while(1);
  		}
 
-/* 	Task_EJER3_init();
+ 	Task_EJER3_init();
  	Task_TIME_init();
  	Task_COMM_init();
  	Task_HW_init();
- 	Task_ORION_init();*/
-
- 	  Task_WIFI_init();     // <- primero WiFi
- 	    Task_COMM_init();     // <- luego COMM
- 	    Task_TIME_init();
- 	    Task_ORION_init();
- 	    Task_HW_init();
- 	    Task_EJER3_init();
+ 	Task_ORION_init();
 
 }
 
