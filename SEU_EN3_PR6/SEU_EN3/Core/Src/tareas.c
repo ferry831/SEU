@@ -17,7 +17,7 @@
 #include "task_COMM.h"
 #include "task_EJER3.h"
 #include "task_HW.h"
-
+#include "task_WIFI.h"
 #include "task_ORION.h"
 
 	//g_mode (Entregable 2)
@@ -26,8 +26,13 @@
 	volatile uint32_t g_ldr_pct  = 0;
 	volatile int32_t  g_temp_x10 = 0;
 	volatile uint32_t g_pot_pct  = 0;
-
-
+	//Inicialización Max/min Sensores (EN3)
+	volatile int32_t  g_temp_max      = -9999;
+	volatile int32_t  g_temp_min      =  9999;
+	volatile uint32_t g_ldr_max       = 0;
+	volatile uint32_t g_ldr_min       = 1000;
+	volatile char     g_alarma_src[32] = "";
+	volatile uint32_t g_alarma_src_seq = 0;
 
 void CONFIGURACION_INICIAL(void){
 

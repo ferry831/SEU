@@ -71,6 +71,8 @@ void Task_HW(void *pvParameters) {
         g_ldr_pct  = ldr_pct;
         g_temp_x10 = temp_x10;
 
+
+
         uint32_t ntc_pct = 0;
         if (temp_x10 > 250) {
             ntc_pct = ((uint32_t)(temp_x10 - 250) * 1000) / 50;
@@ -78,6 +80,12 @@ void Task_HW(void *pvParameters) {
         }
 
         uint32_t display_pct = (g_sensor_sel == 0) ? ldr_pct : ntc_pct;
+
+        /* Actualizar máximos y mínimos históricos */
+             if (temp_x10 > g_temp_max) g_temp_max = temp_x10;
+             if (temp_x10 < g_temp_min) g_temp_min = temp_x10;
+             if (ldr_pct  > g_ldr_max)  g_ldr_max  = ldr_pct;
+             if (ldr_pct  < g_ldr_min)  g_ldr_min  = ldr_pct;
 
         /* ---- Reactivación alarma 10s ---- */
         if (g_alarm_disarmed && (now - g_disarm_tick) >= 10000) {

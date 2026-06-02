@@ -28,7 +28,7 @@
 #define FREERTOS_5SEG		(5000/portTICK_PERIOD_MS)
 
 // Orion Context IoT name
-#define IoT_NAME   	 	  "SensorSEU_PPB00"
+#define IoT_NAME   	 	  "SensorSEU_19"
 #define IoT_NAME_CLONE    "SensorSEU_ZL"
 #define SSID      "routerSEU"
 #define SSID_PASS "00000000"
@@ -40,13 +40,21 @@
 
 void CONFIGURACION_INICIAL(void);
 
-//g_mode (Entregable 2)
+//global_mode (Entregable 2)
 extern volatile int global_mode;
 //Variables Sensores (PR6)
 extern volatile uint32_t g_ldr_pct;
 extern volatile int32_t  g_temp_x10;
 extern volatile uint32_t g_pot_pct;
 
+/* Sensores: Máximos y mínimos */
+extern volatile int32_t  g_temp_max;
+extern volatile int32_t  g_temp_min;
+extern volatile uint32_t g_ldr_max;
+extern volatile uint32_t g_ldr_min;
+/* Alarma_src: nodo clon silenciar */
+extern volatile char     g_alarma_src[32];
+extern volatile uint32_t g_alarma_src_seq;
 
 
 #endif

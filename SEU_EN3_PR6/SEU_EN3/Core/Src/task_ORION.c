@@ -13,7 +13,7 @@
 
 #define ORION_HOST  "pperezs-sec.disca.upv.es"
 #define ORION_PORT  1026
-#define SENSOR_ID   "SensorSEU_19"
+#define SENSOR_ID   "SensorSEU_19" //Usar "SensorSEU_00" para pruebas (está siempre activo) | En laboratorio: "SensorSEU_19"
 
 void Task_ORION_init(void) {
     BaseType_t res_task;
@@ -46,6 +46,10 @@ void Task_ORION(void *pvParameters) {
         int32_t  temp_x10 = g_temp_x10;
         uint32_t ldr_pct  = g_ldr_pct;
         uint32_t pot_pct  = g_pot_pct;
+        int32_t  temp_max = g_temp_max;
+        int32_t  temp_min = g_temp_min;
+        uint32_t ldr_max  = g_ldr_max;
+        uint32_t ldr_min  = g_ldr_min;
 
         int temp_int = temp_x10 / 10;
         int temp_dec = (temp_x10 < 0 ? -temp_x10 : temp_x10) % 10;
@@ -53,31 +57,42 @@ void Task_ORION(void *pvParameters) {
         /* ---- Construir el cuerpo JSON ---- */
         snprintf(body_buf, sizeof(body_buf),
             "{"
-            "\"actionType\":\"update\","
-            "\"entities\":[{"
-            "\"id\":\"%s\","
-            "\"type\":\"Sensor\","
             "\"Temperatura\":{"
             "\"type\":\"String\","
-            "\"value\":\"%d.%d,%lu.%lu,0.0,50.0\"},"
+            "\"value\":\"%d.%d,%d.%d,%d.%d,%lu.%lu\"},"
             "\"IntensidadLuz\":{"
             "\"type\":\"String\","
-            "\"value\":\"%lu.%lu,%lu.%lu,0.0,100.0\"},"
+            "\"value\":\"%lu.%lu,%lu.%lu,%lu.%lu,%lu.%lu\"},"
             "\"Alarma\":{"
             "\"type\":\"boolean\","
             "\"value\":\"%s\"},"
+            "\"Alarma_src\":{"
+            "\"type\":\"string\","
+            "\"value\":\"\"},"
             "\"modo\":{"
             "\"type\":\"string\","
             "\"value\":\"%s\"}"
-            "}]}",
-            SENSOR_ID,
+            "}",
+            /* Temperatura: actual, max, min, nivel_disparo */
             temp_int, temp_dec,
-            pot_pct / 10, pot_pct % 10,
-            ldr_pct / 10, ldr_pct % 10,
-            pot_pct / 10, pot_pct % 10,
+            temp_max/10, (temp_max<0?-temp_max:temp_max)%10,
+            temp_min/10, (temp_min<0?-temp_min:temp_min)%10,
+            pot_pct/10, pot_pct%10,
+            /* IntensidadLuz: actual, max, min, nivel_disparo */
+            ldr_pct/10, ldr_pct%10,
+            ldr_max/10, ldr_max%10,
+            ldr_min/10, ldr_min%10,
+            pot_pct/10, pot_pct%10,
+            /* Alarma */
             g_alarm_active ? "T" : "F",
-            SENSOR_ID
+            /* modo */
+            IoT_NAME
         );
+
+
+        /* DEBUG: ver el JSON antes de enviarlo */
+               bprintf("JSON len: %d\r\n", (int)strlen(body_buf));
+               bprintf("JSON: %s\r\n", body_buf);
 
         /* ---- Construir la petición HTTP POST ---- */
         /* Rellenar la estructura COMM_request directamente */
@@ -101,7 +116,7 @@ void Task_ORION(void *pvParameters) {
                 /* Construir petición HTTP directamente en el buffer */
                 snprintf((char *)COMM_request.HTTP_request,
                          sizeof(COMM_request.HTTP_request),
-                    "POST /v2/op/update HTTP/1.1\r\n"
+					"PATCH /v2/entities/" IoT_NAME "/attrs HTTP/1.1\r\n"
                     "Host: %s\r\n"
                     "Content-Type: application/json\r\n"
                     "Accept: application/json\r\n"
