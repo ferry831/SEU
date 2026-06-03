@@ -35,6 +35,7 @@
     // Variables Modo Clon (EN3)
     volatile uint8_t  g_target_clone_id = 0;
     volatile uint8_t  g_clone_alarm_active = 0;
+    volatile uint8_t g_send_alarm_off = 0;
 
     volatile float    g_clone_temp_current = 0.0f;
     volatile float    g_clone_temp_max = 0.0f;

@@ -43,6 +43,7 @@ void CONFIGURACION_INICIAL(void);
 // Variables modo clon (Entregable 3)
 extern volatile uint8_t  g_target_clone_id;
 extern volatile uint8_t  g_clone_alarm_active;
+extern volatile uint8_t g_send_alarm_off;
 
 extern volatile float    g_clone_temp_current;
 extern volatile float    g_clone_temp_max;

@@ -57,7 +57,7 @@ void Task_ORION(void *pvParameters) {
                 "{"
                 "\"Temperatura\":{"
                 "\"type\":\"String\","
-                "\"value\":\"%d.%d,%d.%d,%d.%d,%lu.%lu\"},"
+                "\"value\":\"%d.%d,%ld.%ld,%ld.%ld,%lu.%lu\"},"
                 "\"IntensidadLuz\":{"
                 "\"type\":\"String\","
                 "\"value\":\"%lu.%lu,%lu.%lu,%lu.%lu,%lu.%lu\"},"
@@ -158,100 +158,162 @@ void Task_ORION(void *pvParameters) {
             // 1. Obtener a quién queremos leer (00 a 26)
             uint8_t target_id = g_target_clone_id;
             
-            signal = 1;
-            do {
-                if (xSemaphoreTake(COMM_xSem, 20000 / portTICK_RATE_MS) != pdTRUE) {
-                    bprintf("ORION CLON: timeout semaforo\r\n");
-                    HAL_NVIC_SystemReset();
-                }
-                
-                if (COMM_request.command == 0) {
-                    COMM_request.command  = 1;
-                    COMM_request.result   = 0;
-                    COMM_request.dst_port = ORION_PORT;
+            /* Silenciar alarma remota */
+            if (g_send_alarm_off == 1) {
+                g_send_alarm_off = 0; // Limpiamos el flag
+                g_alarma_src_seq++;   // Incrementamos secuencia
 
-                    strncpy((char *)COMM_request.dst_address, ORION_HOST, sizeof(COMM_request.dst_address) - 1);
+                snprintf(body_buf, sizeof(body_buf),
+                    "{"
+                    "\"Alarma_src\":{"
+                    "\"type\":\"string\","
+                    "\"value\":\"%s_%02lu\"}"
+                    "}",
+                    IoT_NAME, g_alarma_src_seq
+                );
 
-                    // Petición GET al nodo clonado
-                    snprintf((char *)COMM_request.HTTP_request, sizeof(COMM_request.HTTP_request),
-                        "GET /v2/entities/SensorSEU_%02d HTTP/1.1\r\n"
-                        "Host: %s\r\n"
-                        "Accept: application/json\r\n"
-                        "Connection: close\r\n\r\n",
-                        target_id, ORION_HOST
-                    );
+                signal = 1;
+                do {
+                    if (xSemaphoreTake(COMM_xSem, 20000 / portTICK_RATE_MS) != pdTRUE) {
+                        bprintf("ORION CLON: timeout semaforo\r\n");
+                        HAL_NVIC_SystemReset();
+                    }
+                    if (COMM_request.command == 0) {
+                        COMM_request.command  = 1;
+                        COMM_request.result   = 0;
+                        COMM_request.dst_port = ORION_PORT;
+                        strncpy((char *)COMM_request.dst_address, ORION_HOST, sizeof(COMM_request.dst_address) - 1);
 
-                    bprintf(">> [CLON] Pidiendo datos a SensorSEU_%02d...\r\n", target_id);
+                        snprintf((char *)COMM_request.HTTP_request, sizeof(COMM_request.HTTP_request),
+                            "PATCH /v2/entities/SensorSEU_%02d/attrs HTTP/1.1\r\n"
+                            "Host: %s\r\n"
+                            "Content-Type: application/json\r\n"
+                            "Accept: application/json\r\n"
+                            "Content-Length: %d\r\n"
+                            "\r\n"
+                            "%s",
+                            target_id, ORION_HOST, (int)strlen(body_buf), body_buf
+                        );
 
-                    signal = 0;
-                    xSemaphoreGive(COMM_xSem);
+                        bprintf(">> [CLON] Silenciando alarma de SensorSEU_%02d...\r\n", target_id);
+                        signal = 0;
+                        xSemaphoreGive(COMM_xSem);
+                    } else {
+                        xSemaphoreGive(COMM_xSem);
+                        vTaskDelay((1 + (rand() % 100)) / portTICK_RATE_MS);
+                    }
+                } while (signal);
+
+                while (COMM_request.result != 1) vTaskDelay(10 / portTICK_RATE_MS);
+
+                if (strstr((char *)COMM_request.HTTP_response, "204") != NULL ||
+                    strstr((char *)COMM_request.HTTP_response, "200") != NULL) {
+                    bprintf(">> [CLON] Alarma silenciada con exito.\r\n");
                 } else {
-                    xSemaphoreGive(COMM_xSem);
-                    vTaskDelay((1 + (rand() % 100)) / portTICK_RATE_MS);
+                    bprintf(">> [CLON] Error silenciando alarma.\r\n");
                 }
-            } while (signal);
 
-            /* Esperar respuesta */
-            while (COMM_request.result != 1) vTaskDelay(10 / portTICK_RATE_MS);
-
-            /* DEBUG: Ver respuesta del nodo clonado */
-            bprintf("ORION CLON resp cruda: %.200s\r\n", COMM_request.HTTP_response);
-
-            // 2. Parsear el JSON
-            if (COMM_request.HTTP_response != NULL && strlen((char *)COMM_request.HTTP_response) > 0) {
-                cJSON *json = cJSON_Parse((char *)COMM_request.HTTP_response);
-                
-                if (json != NULL) {
-                    
-                    // Extraer Alarma
-                    cJSON *alarma_obj = cJSON_GetObjectItem(json, "Alarma");
-                    if (alarma_obj != NULL) {
-                        cJSON *val = cJSON_GetObjectItem(alarma_obj, "value");
-                        if (val != NULL && val->valuestring != NULL) {
-                            g_clone_alarm_active = (strcmp(val->valuestring, "T") == 0) ? 1 : 0;
-                        }
-                    }
-
-                    // Extraer Temperatura ("Actual,Max,Min,Umbral")
-                    cJSON *temp_obj = cJSON_GetObjectItem(json, "Temperatura");
-                    if (temp_obj != NULL) {
-                        cJSON *val = cJSON_GetObjectItem(temp_obj, "value");
-                        if (val != NULL && val->valuestring != NULL) {
-                            float t_act, t_max, t_min, t_thr;
-                            if (sscanf(val->valuestring, "%f,%f,%f,%f", &t_act, &t_max, &t_min, &t_thr) == 4) {
-                                g_clone_temp_current = t_act;
-                                g_clone_temp_max = t_max;
-                                g_clone_temp_min = t_min;
-                                g_clone_temp_thr = t_thr;
-                            }
-                        }
-                    }
-
-                    // Extraer Luz ("Actual,Max,Min,Umbral")
-                    cJSON *luz_obj = cJSON_GetObjectItem(json, "IntensidadLuz");
-                    if (luz_obj != NULL) {
-                        cJSON *val = cJSON_GetObjectItem(luz_obj, "value");
-                        if (val != NULL && val->valuestring != NULL) {
-                            float l_act, l_max, l_min, l_thr;
-                            if (sscanf(val->valuestring, "%f,%f,%f,%f", &l_act, &l_max, &l_min, &l_thr) == 4) {
-                                g_clone_ldr_current = l_act;
-                                g_clone_ldr_max = l_max;
-                                g_clone_ldr_min = l_min;
-                                g_clone_ldr_thr = l_thr;
-                            }
-                        }
-                    }
-
-                    cJSON_Delete(json);
-                    bprintf(">> [CLON] Datos de SensorSEU_%02d parseados y guardados.\r\n", target_id);
-                } else {
-                    bprintf(">> [CLON] Error parseando JSON de respuesta.\r\n");
-                }
+                COMM_request.result  = 0;
+                COMM_request.command = 0;
+                vTaskDelay(2000 / portTICK_RATE_MS); 
             }
+            // --- B) COMPORTAMIENTO NORMAL: LECTURA (GET) ---
+            else {
+                signal = 1;
+                do {
+                    if (xSemaphoreTake(COMM_xSem, 20000 / portTICK_RATE_MS) != pdTRUE) {
+                        bprintf("ORION CLON: timeout semaforo\r\n");
+                        HAL_NVIC_SystemReset();
+                    }
+                    
+                    if (COMM_request.command == 0) {
+                        COMM_request.command  = 1;
+                        COMM_request.result   = 0;
+                        COMM_request.dst_port = ORION_PORT;
 
-            COMM_request.result  = 0;
-            COMM_request.command = 0;
-            vTaskDelay(1000 / portTICK_RATE_MS); // Polling cada segundo en modo clon
+                        strncpy((char *)COMM_request.dst_address, ORION_HOST, sizeof(COMM_request.dst_address) - 1);
+
+                        // Petición GET al nodo clonado
+                        snprintf((char *)COMM_request.HTTP_request, sizeof(COMM_request.HTTP_request),
+                            "GET /v2/entities/SensorSEU_%02d HTTP/1.1\r\n"
+                            "Host: %s\r\n"
+                            "Accept: application/json\r\n"
+                            "Connection: close\r\n\r\n",
+                            target_id, ORION_HOST
+                        );
+
+                        bprintf(">> [CLON] Pidiendo datos a SensorSEU_%02d...\r\n", target_id);
+
+                        signal = 0;
+                        xSemaphoreGive(COMM_xSem);
+                    } else {
+                        xSemaphoreGive(COMM_xSem);
+                        vTaskDelay((1 + (rand() % 100)) / portTICK_RATE_MS);
+                    }
+                } while (signal);
+
+                /* Esperar respuesta */
+                while (COMM_request.result != 1) vTaskDelay(10 / portTICK_RATE_MS);
+
+                /* DEBUG: Ver respuesta del nodo clonado */
+                bprintf("ORION CLON resp cruda: %.200s\r\n", COMM_request.HTTP_response);
+
+                // 2. Parsear el JSON
+                if (strlen((char *)COMM_request.HTTP_response) > 0) {
+                    cJSON *json = cJSON_Parse((char *)COMM_request.HTTP_response);
+                    
+                    if (json != NULL) {
+                        
+                        // Extraer Alarma
+                        cJSON *alarma_obj = cJSON_GetObjectItem(json, "Alarma");
+                        if (alarma_obj != NULL) {
+                            cJSON *val = cJSON_GetObjectItem(alarma_obj, "value");
+                            if (val != NULL && val->valuestring != NULL) {
+                                g_clone_alarm_active = (strcmp(val->valuestring, "T") == 0) ? 1 : 0;
+                            }
+                        }
+
+                        // Extraer Temperatura ("Actual,Max,Min,Umbral")
+                        cJSON *temp_obj = cJSON_GetObjectItem(json, "Temperatura");
+                        if (temp_obj != NULL) {
+                            cJSON *val = cJSON_GetObjectItem(temp_obj, "value");
+                            if (val != NULL && val->valuestring != NULL) {
+                                float t_act, t_max, t_min, t_thr;
+                                if (sscanf(val->valuestring, "%f,%f,%f,%f", &t_act, &t_max, &t_min, &t_thr) == 4) {
+                                    g_clone_temp_current = t_act;
+                                    g_clone_temp_max = t_max;
+                                    g_clone_temp_min = t_min;
+                                    g_clone_temp_thr = t_thr;
+                                }
+                            }
+                        }
+
+                        // Extraer Luz ("Actual,Max,Min,Umbral")
+                        cJSON *luz_obj = cJSON_GetObjectItem(json, "IntensidadLuz");
+                        if (luz_obj != NULL) {
+                            cJSON *val = cJSON_GetObjectItem(luz_obj, "value");
+                            if (val != NULL && val->valuestring != NULL) {
+                                float l_act, l_max, l_min, l_thr;
+                                if (sscanf(val->valuestring, "%f,%f,%f,%f", &l_act, &l_max, &l_min, &l_thr) == 4) {
+                                    g_clone_ldr_current = l_act;
+                                    g_clone_ldr_max = l_max;
+                                    g_clone_ldr_min = l_min;
+                                    g_clone_ldr_thr = l_thr;
+                                }
+                            }
+                        }
+
+                        cJSON_Delete(json);
+                        bprintf(">> [CLON] Datos de SensorSEU_%02d parseados y guardados.\r\n", target_id);
+                    } else {
+                        bprintf(">> [CLON] Error parseando JSON de respuesta.\r\n");
+                    }
+                } 
+                
+                COMM_request.result  = 0;
+                COMM_request.command = 0;
+                vTaskDelay(1000 / portTICK_RATE_MS); // Polling cada segundo en modo clon
+            }
         } 
         
         /* Mode test (ignorar WiFi)*/
