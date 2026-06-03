@@ -40,6 +40,20 @@
 
 void CONFIGURACION_INICIAL(void);
 
+// Variables modo clon (Entregable 3)
+extern volatile uint8_t  g_target_clone_id;
+extern volatile uint8_t  g_clone_alarm_active;
+
+extern volatile float    g_clone_temp_current;
+extern volatile float    g_clone_temp_max;
+extern volatile float    g_clone_temp_min;
+extern volatile float    g_clone_temp_thr;
+
+extern volatile float    g_clone_ldr_current;
+extern volatile float    g_clone_ldr_max;
+extern volatile float    g_clone_ldr_min;
+extern volatile float    g_clone_ldr_thr;
+
 //global_mode (Entregable 2)
 extern volatile int global_mode;
 //Variables Sensores (PR6)
