@@ -51,6 +51,64 @@ void Task_HW_init(void) {
     xTaskCreate(Task_HW, "HW", 1024, NULL, HIGH_PRIORITY, NULL);
 }
 
+/* --- FUNCION MODO TEST --- */
+extern UART_HandleTypeDef huart1; // Para comunicarnos directamente con el ESP8266
+
+static void ejecutar_secuencia_test(uint8_t b_izq, uint8_t b_der, int32_t temp, uint32_t ldr, uint32_t pot)
+{
+    bprintf("\r\n=== INICIANDO SECUENCIA TEST ===\r\n");
+
+    /* 1.- Barrido de LEDs */
+    bprintf("1.- Barrido de LEDs...\r\n");
+    for (int i = 0; i < 8; i++) {
+        LED_setAll(1 << i);
+        vTaskDelay(100 / portTICK_RATE_MS);
+    }
+    for (int i = 6; i >= 0; i--) {
+        LED_setAll(1 << i);
+        vTaskDelay(100 / portTICK_RATE_MS);
+    }
+    LED_setAll(0x00);
+
+    /* 2.- Hacer sonar el buzzer */
+    bprintf("2.- Sonando Buzzer...\r\n");
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
+    vTaskDelay(300 / portTICK_RATE_MS);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
+
+    /* 3.- Valores Analógicos */
+    // Convertimos el potenciómetro a Voltios (asumiendo 3.3V max y ADC de 12 bits = 4095). 
+    // Multiplicamos por 100 para imprimirlo con %lu.%lu y evitar que falle el %f.
+    uint32_t pot_v_x100 = (pot * 330) / 4095;
+    
+    bprintf("3.- Valores Analogicos:\r\n");
+    bprintf("    - Temp:  %ld.%ld C\r\n", temp/10, (temp<0?-temp:temp)%10);
+    bprintf("    - LDR:   %lu.%lu %%\r\n", ldr/10, ldr%10);
+    bprintf("    - Poten: %lu.%02lu V (%lu/4095)\r\n", pot_v_x100/100, pot_v_x100%100, pot);
+
+    /* 4.- Valor de los botones */
+    bprintf("4.- Botones -> IZQ: %d | DER: %d\r\n", b_izq, b_der);
+
+    /* 5.- Enviar orden AT y mostrar salida */
+    bprintf("5.- Enviando orden AT al ESP8266...\r\n");
+    uint8_t at_resp[64] = {0};
+    
+    // Detenemos temporalmente la escucha en segundo plano (DMA) de la tarea WiFi 
+    // para que no nos robe la respuesta del comando AT.
+    HAL_UART_AbortReceive(&huart1); 
+    __HAL_UART_FLUSH_DRREGISTER(&huart1); // Limpiamos basura previa
+    
+    // Transmitimos "AT" y leemos la respuesta
+    HAL_UART_Transmit(&huart1, (uint8_t*)"AT\r\n", 4, 100);
+    HAL_UART_Receive(&huart1, at_resp, sizeof(at_resp)-1, 500);
+    
+    // Aseguramos fin de cadena para que bprintf no se cuelgue
+    at_resp[sizeof(at_resp)-1] = '\0'; 
+    bprintf("    Salida AT: %s\r\n", at_resp);
+
+    bprintf("=== FIN SECUENCIA TEST ===\r\n\r\n");
+}
+
 void Task_HW(void *pvParameters) {
 
     static uint8_t btn_izq_prev = 0;
@@ -129,31 +187,29 @@ void Task_HW(void *pvParameters) {
                         g_sensor_sel == 0 ? "LDR (luz)" : "NTC (temp)");
             }
 
-            /* BTN_DER solo */
             if (btn_der && !btn_der_prev) {
 
                 if (global_mode == 1) {
+
                     /*
-                     * En modo clon, el botón derecho pide apagar la alarma
-                     * del nodo clonado escribiendo Alarma_src desde Task_ORION.
+                     * En modo clon, el boton derecho manda una orden
+                     * para apagar la alarma del nodo clonado.
+                     *
+                     * No hacemos aqui el PATCH. Solo activamos el flag.
+                     * Task_ORION se encarga de escribir Alarma_src.
                      */
-                    if (g_clone_alarm_active) {
-                        g_send_alarm_off = 1;
+                    g_send_alarm_off = 1;
 
-                        clone_alarm_muted = 1;
-                        clone_mute_tick = now;
+                    clone_alarm_muted = 1;
+                    clone_mute_tick = now;
 
-                        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
+                    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
 
-                        bprintf(">> [CLON] Solicitud apagar alarma remota enviada.\r\n");
-                    } else {
-                        bprintf(">> [CLON] Modo clon. Nodo actual: SensorSEU_%02d\r\n",
-                                g_target_clone_id);
-                    }
+                    bprintf(">> [HW CLON] Boton derecho: pedir apagar alarma de SensorSEU_%02d\r\n",
+                            g_target_clone_id);
+
                 } else {
-                    /*
-                     * En modo conectado: comportamiento original.
-                     */
+
                     if (g_alarm_active) {
                         g_alarm_active   = 0;
                         g_alarm_disarmed = 1;
@@ -175,6 +231,14 @@ void Task_HW(void *pvParameters) {
 
         btn_izq_prev = btn_izq;
         btn_der_prev = btn_der;
+
+        if (global_mode == 2) {
+            // Ejecutamos todos los pasos
+            ejecutar_secuencia_test(btn_izq, btn_der, temp_x10, ldr_pct, pot_pct);
+            
+            vTaskDelay(3000 / portTICK_RATE_MS);
+            continue; 
+        }
 
         /* ---- Actualizar máximos y mínimos locales ---- */
         if (temp_x10 > g_temp_max) g_temp_max = temp_x10;
