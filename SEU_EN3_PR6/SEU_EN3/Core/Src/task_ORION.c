@@ -14,7 +14,96 @@
 
 #define ORION_HOST  "pperezs-sec.disca.upv.es"
 #define ORION_PORT  1026
-#define SENSOR_ID   "SensorSEU_19" //Usar "SensorSEU_00" para pruebas (está siempre activo) | En laboratorio: "SensorSEU_19"
+#define SENSOR_ID   "SensorSEU_20" //Usar "SensorSEU_00" para pruebas (está siempre activo) | En laboratorio: "SensorSEU_19"
+
+static char last_alarma_src_processed[40] = "";
+
+static void procesar_alarma_src_local(const char *src)
+{
+    if (src == NULL || src[0] == '\0') {
+        return;
+    }
+
+    if (strcmp(src, last_alarma_src_processed) == 0) {
+        return;
+    }
+
+    strncpy(last_alarma_src_processed, src, sizeof(last_alarma_src_processed) - 1);
+    last_alarma_src_processed[sizeof(last_alarma_src_processed) - 1] = '\0';
+
+    bprintf(">> [NORMAL] Nueva orden Alarma_src recibida: %s\r\n", src);
+
+    if (g_alarm_active) {
+        g_alarm_active = 0;
+        g_alarm_disarmed = 1;
+        g_disarm_tick = xTaskGetTickCount();
+
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
+
+        bprintf(">> [NORMAL] Alarma local apagada por clon.\r\n");
+    }
+}
+
+
+static const char *parse_num_x10(const char *p, int32_t *out)
+{
+    int sign = 1;
+    int32_t entero = 0;
+    int32_t dec = 0;
+
+    while (*p == ' ' || *p == '\t') p++;
+
+    if (*p == '-') {
+        sign = -1;
+        p++;
+    }
+
+    while (*p >= '0' && *p <= '9') {
+        entero = entero * 10 + (*p - '0');
+        p++;
+    }
+
+    if (*p == '.') {
+        p++;
+        if (*p >= '0' && *p <= '9') {
+            dec = (*p - '0');
+            p++;
+
+            /* Ignorar más decimales si existen */
+            while (*p >= '0' && *p <= '9') {
+                p++;
+            }
+        }
+    }
+
+    *out = sign * (entero * 10 + dec);
+    return p;
+}
+
+static int parse_csv4_x10(const char *s,
+                          int32_t *a,
+                          int32_t *b,
+                          int32_t *c,
+                          int32_t *d)
+{
+    const char *p = s;
+
+    p = parse_num_x10(p, a);
+    if (*p != ',') return 0;
+    p++;
+
+    p = parse_num_x10(p, b);
+    if (*p != ',') return 0;
+    p++;
+
+    p = parse_num_x10(p, c);
+    if (*p != ',') return 0;
+    p++;
+
+    p = parse_num_x10(p, d);
+
+    return 1;
+}
 
 void Task_ORION_init(void) {
     BaseType_t res_task;
@@ -150,6 +239,74 @@ void Task_ORION(void *pvParameters) {
             COMM_request.result  = 0;
             COMM_request.command = 0;
 
+            /* Leer mi propia entidad para comprobar si un clon ha escrito Alarma_src */
+            signal = 1;
+            do {
+                if (xSemaphoreTake(COMM_xSem, 20000 / portTICK_RATE_MS) != pdTRUE) {
+                    bprintf("ORION SELF: timeout semaforo\r\n");
+                    HAL_NVIC_SystemReset();
+                }
+
+                if (COMM_request.command == 0) {
+                    COMM_request.command  = 1;
+                    COMM_request.result   = 0;
+                    COMM_request.dst_port = ORION_PORT;
+
+                    strncpy((char *)COMM_request.dst_address,
+                            ORION_HOST,
+                            sizeof(COMM_request.dst_address) - 1);
+
+                    snprintf((char *)COMM_request.HTTP_request,
+                             sizeof(COMM_request.HTTP_request),
+                        "GET /v2/entities/" IoT_NAME " HTTP/1.1\r\n"
+                        "Host: %s:%d\r\n"
+                        "Accept: application/json\r\n"
+                        "Connection: close\r\n\r\n",
+                        ORION_HOST,
+                        ORION_PORT
+                    );
+
+                    bprintf(">> [NORMAL] Leyendo mi Alarma_src...\r\n");
+
+                    signal = 0;
+                    xSemaphoreGive(COMM_xSem);
+                } else {
+                    xSemaphoreGive(COMM_xSem);
+                    vTaskDelay((1 + (rand() % 100)) / portTICK_RATE_MS);
+                }
+            } while (signal);
+
+            while (COMM_request.result != 1) {
+                vTaskDelay(10 / portTICK_RATE_MS);
+            }
+
+            if (strlen((char *)COMM_request.HTTP_response) > 0) {
+
+                cleanResponse(COMM_request.HTTP_response,
+                              strlen((char *)COMM_request.HTTP_response));
+
+                cJSON *json = cJSON_Parse((char *)COMM_request.HTTP_response);
+
+                if (json != NULL) {
+                    cJSON *src_obj = cJSON_GetObjectItem(json, "Alarma_src");
+
+                    if (src_obj != NULL) {
+                        cJSON *val = cJSON_GetObjectItem(src_obj, "value");
+
+                        if (val != NULL && cJSON_IsString(val) && val->valuestring != NULL) {
+                            procesar_alarma_src_local(val->valuestring);
+                        }
+                    }
+
+                    cJSON_Delete(json);
+                } else {
+                    bprintf(">> [NORMAL] Error parseando mi entidad para Alarma_src.\r\n");
+                }
+            }
+
+            COMM_request.result  = 0;
+            COMM_request.command = 0;
+
             vTaskDelay(30000 / portTICK_RATE_MS);
         }
 
@@ -258,8 +415,24 @@ void Task_ORION(void *pvParameters) {
                 /* DEBUG: Ver respuesta del nodo clonado */
                 bprintf("ORION CLON resp cruda: %.200s\r\n", COMM_request.HTTP_response);
 
-                // 2. Parsear el JSON
+                /*
+                 * La respuesta del ESP/Orion puede venir con:
+                 * Recv...
+                 * SEND OK
+                 * HTTP/1.1 200 OK
+                 * cabeceras HTTP
+                 * ...
+                 * { JSON real }
+                 *
+                 * cleanResponse deja en COMM_request.HTTP_response solo el JSON.
+                 */
                 if (strlen((char *)COMM_request.HTTP_response) > 0) {
+
+                    cleanResponse(COMM_request.HTTP_response,
+                                  strlen((char *)COMM_request.HTTP_response));
+
+                    bprintf("ORION CLON resp limpia: %.300s\r\n", COMM_request.HTTP_response);
+
                     cJSON *json = cJSON_Parse((char *)COMM_request.HTTP_response);
                     
                     if (json != NULL) {
@@ -278,13 +451,22 @@ void Task_ORION(void *pvParameters) {
                         if (temp_obj != NULL) {
                             cJSON *val = cJSON_GetObjectItem(temp_obj, "value");
                             if (val != NULL && val->valuestring != NULL) {
-                                float t_act, t_max, t_min, t_thr;
-                                if (sscanf(val->valuestring, "%f,%f,%f,%f", &t_act, &t_max, &t_min, &t_thr) == 4) {
-                                    g_clone_temp_current = t_act;
-                                    g_clone_temp_max = t_max;
-                                    g_clone_temp_min = t_min;
-                                    g_clone_temp_thr = t_thr;
-                                }
+                            	int32_t t_act, t_max, t_min, t_thr;
+
+                            	if (parse_csv4_x10(val->valuestring, &t_act, &t_max, &t_min, &t_thr)) {
+                            	    g_clone_temp_current = t_act / 10.0f;
+                            	    g_clone_temp_max     = t_max / 10.0f;
+                            	    g_clone_temp_min     = t_min / 10.0f;
+                            	    g_clone_temp_thr     = t_thr / 10.0f;
+
+                            	    bprintf(">> [CLON] Temp parseada: %.1f %.1f %.1f %.1f\r\n",
+                            	            g_clone_temp_current,
+                            	            g_clone_temp_max,
+                            	            g_clone_temp_min,
+                            	            g_clone_temp_thr);
+                            	} else {
+                            	    bprintf(">> [CLON] Error formato Temperatura: %s\r\n", val->valuestring);
+                            	}
                             }
                         }
 
@@ -293,13 +475,22 @@ void Task_ORION(void *pvParameters) {
                         if (luz_obj != NULL) {
                             cJSON *val = cJSON_GetObjectItem(luz_obj, "value");
                             if (val != NULL && val->valuestring != NULL) {
-                                float l_act, l_max, l_min, l_thr;
-                                if (sscanf(val->valuestring, "%f,%f,%f,%f", &l_act, &l_max, &l_min, &l_thr) == 4) {
-                                    g_clone_ldr_current = l_act;
-                                    g_clone_ldr_max = l_max;
-                                    g_clone_ldr_min = l_min;
-                                    g_clone_ldr_thr = l_thr;
-                                }
+                            	int32_t l_act, l_max, l_min, l_thr;
+
+                            	if (parse_csv4_x10(val->valuestring, &l_act, &l_max, &l_min, &l_thr)) {
+                            	    g_clone_ldr_current = l_act / 10.0f;
+                            	    g_clone_ldr_max     = l_max / 10.0f;
+                            	    g_clone_ldr_min     = l_min / 10.0f;
+                            	    g_clone_ldr_thr     = l_thr / 10.0f;
+
+                            	    bprintf(">> [CLON] Luz parseada: %.1f %.1f %.1f %.1f\r\n",
+                            	            g_clone_ldr_current,
+                            	            g_clone_ldr_max,
+                            	            g_clone_ldr_min,
+                            	            g_clone_ldr_thr);
+                            	} else {
+                            	    bprintf(">> [CLON] Error formato IntensidadLuz: %s\r\n", val->valuestring);
+                            	}
                             }
                         }
 

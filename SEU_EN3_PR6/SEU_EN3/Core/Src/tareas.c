@@ -70,7 +70,7 @@ void CONFIGURACION_INICIAL(void){
 	
       Task_WIFI_init();     // <- primero WiFi
         Task_COMM_init();     // <- luego COMM
-        Task_TIME_init();
+        //Task_TIME_init();
         Task_ORION_init();
         Task_HW_init();
         Task_EJER3_init();

@@ -28,7 +28,7 @@
 #define FREERTOS_5SEG		(5000/portTICK_PERIOD_MS)
 
 // Orion Context IoT name
-#define IoT_NAME   	 	  "SensorSEU_19"
+#define IoT_NAME   	 	  "SensorSEU_20"
 #define IoT_NAME_CLONE    "SensorSEU_ZL"
 #define SSID      "routerSEU"
 #define SSID_PASS "00000000"
